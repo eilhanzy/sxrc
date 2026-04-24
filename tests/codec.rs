@@ -262,6 +262,38 @@ fn ram_codec_uses_raw_fallback_for_incompressible_pages() {
 }
 
 #[test]
+fn page_local_dynamic_patterns_require_meaningful_net_savings() {
+    let manifest = SxrcManifest::from_yaml_str(
+        r#"
+version: "1.0-alpha"
+target_arch: "generic"
+compression_unit: "16-bit"
+endian: "big"
+"#,
+    )
+    .unwrap();
+    let config = SxrcCodecConfig {
+        page_size: 64,
+        enable_dynamic_patterns: true,
+        min_dynamic_pattern_repeats: 3,
+        max_dynamic_pattern_len: 4,
+        max_dynamic_patterns: 8,
+        ..SxrcCodecConfig::from_manifest(&manifest)
+    };
+    let encoder = SxrcFileEncoder::new(&manifest, config).unwrap();
+    let decoder = SxrcFileDecoder::new(&manifest, config).unwrap();
+
+    let input = [
+        0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD,
+    ];
+    let encoded = encoder.encode(&input).unwrap();
+
+    assert_eq!(decoder.decode(&encoded.bytes).unwrap(), input);
+    assert_eq!(encoded.stats.dynamic_pattern_count, 0);
+    assert_eq!(encoded.stats.dynamic_metadata_bytes, 0);
+}
+
+#[test]
 fn sxrc_stats_can_be_compared_with_zstd_ratio() {
     let manifest = SxrcManifest::from_yaml_str(sample_manifest_yaml()).unwrap();
     let config = SxrcCodecConfig::from_manifest(&manifest);

@@ -14,6 +14,7 @@ const TOKEN_RAW_ESCAPE: u8 = 0x04;
 const PACKED_DICT_BASE: u8 = 0x40;
 const PACKED_PATTERN_BASE: u8 = 0x80;
 const PACKED_REF_MAX: u32 = 0x3f;
+const PAGE_LOCAL_DYNAMIC_PATTERN_MIN_NET_SAVINGS: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SxrcCodecConfig {
@@ -235,6 +236,12 @@ impl SxrcFileEncoder {
             return Ok(Vec::new());
         }
 
+        let min_net_savings = if input.len() <= self.config.page_size {
+            PAGE_LOCAL_DYNAMIC_PATTERN_MIN_NET_SAVINGS
+        } else {
+            1
+        };
+
         let mut occurrences: BTreeMap<Vec<u8>, Vec<usize>> = BTreeMap::new();
         for pattern_len in dynamic_pattern_lengths(self.codebook.unit_len, input.len(), self.config)
         {
@@ -290,8 +297,9 @@ impl SxrcFileEncoder {
                 varint_len(next_id as u64) + varint_len(bytes.len() as u64) + bytes.len();
             let token_cost = repeats * pattern_ref_len(next_id);
             let base_cost = dynamic_pattern_base_cost(bytes.len(), repeats, self.codebook.unit_len);
+            let net_savings = base_cost.saturating_sub(token_cost + metadata_cost);
 
-            if base_cost > token_cost + metadata_cost {
+            if net_savings >= min_net_savings {
                 used_ids.insert(next_id);
                 selected.push(DynamicPatternEntry { id: next_id, bytes });
                 next_id = next_id.saturating_add(1);

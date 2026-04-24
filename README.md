@@ -22,7 +22,10 @@ replacement for entropy coders like zstd on high-entropy data.
 - 8-bit, 16-bit, and 32-bit compression units.
 - Little-endian and big-endian dictionary value materialization.
 - Page codec with `Raw` fallback when a page is not profitably compressible.
-- `sxrc-bench` CLI for file, RAM, and zram simulation benchmarks.
+- `sxrc-bench` CLI for file, RAM, and zram simulation benchmarks, baseline
+  comparisons, warmups, latency percentiles, and JSON export.
+- `sxrc-train` CLI for deriving deterministic static manifests from real page
+  corpora.
 - Dual license: `MPL-2.0 OR GPL-2.0-or-later`.
 
 ## Repository Layout
@@ -32,9 +35,15 @@ replacement for entropy coders like zstd on high-entropy data.
 - [`src/file_codec.rs`](src/file_codec.rs): `.sxrc` stream encoder/decoder.
 - [`src/ram_codec.rs`](src/ram_codec.rs): page codec and raw fallback.
 - [`src/bin/sxrc-bench.rs`](src/bin/sxrc-bench.rs): benchmark harness.
+- [`src/bin/sxrc-train.rs`](src/bin/sxrc-train.rs): offline corpus trainer for
+  static manifests.
 - [`docs/format.md`](docs/format.md): binary stream format reference.
 - [`docs/manifest.md`](docs/manifest.md): manifest schema and validation rules.
 - [`docs/benchmarks.md`](docs/benchmarks.md): benchmark usage and output.
+- [`docs/training.md`](docs/training.md): corpus training workflow and trainer
+  heuristics.
+- [`docs/legacy-linux.md`](docs/legacy-linux.md): real-machine capture and
+  reporting workflow for legacy Linux laptops.
 - [`docs/zram.md`](docs/zram.md): zram simulation and kernel-port notes.
 
 ## Quick Start
@@ -165,7 +174,22 @@ cargo run --release --bin sxrc-bench -- \
 ```
 
 The CLI prints ratio, encode/decode throughput, dynamic metadata size, and
-zram page class counts. See [`docs/benchmarks.md`](docs/benchmarks.md).
+zram page class counts. It can also compare against `zstd`/`lz4`, emit
+latency percentiles, and export machine-readable JSON. See
+[`docs/benchmarks.md`](docs/benchmarks.md).
+
+Train a manifest from a real page corpus:
+
+```bash
+cargo run --release --bin sxrc-train -- \
+  --input-dir ./corpus/pages \
+  --output ./trained.sxrc.yaml \
+  --page-size 4096 \
+  --compression-unit 16-bit \
+  --endian little \
+  --max-dict 64 \
+  --max-patterns 32
+```
 
 ## Format and Manifest Docs
 
@@ -173,6 +197,8 @@ zram page class counts. See [`docs/benchmarks.md`](docs/benchmarks.md).
   packed refs, varints, dynamic pattern metadata, and raw fallback behavior.
 - [`docs/manifest.md`](docs/manifest.md) documents the YAML schema and all
   validation constraints enforced by the parser/codebook.
+- [`docs/training.md`](docs/training.md) covers corpus layout, deterministic
+  profile generation, and the trainer's scoring rules.
 
 ## Current Limits
 
